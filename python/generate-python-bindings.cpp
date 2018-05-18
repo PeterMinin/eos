@@ -283,19 +283,56 @@ PYBIND11_MODULE(eos, eos_module)
         [](const morphablemodel::MorphableModel& morphable_model,
            const core::LandmarkCollection<Eigen::Vector2f>& landmarks,
            const core::LandmarkMapper& landmark_mapper, int image_width, int image_height,
-           const morphablemodel::EdgeTopology& edge_topology,
-           const fitting::ContourLandmarks& contour_landmarks, const fitting::ModelContour& model_contour,
+           const cpp17::optional<morphablemodel::EdgeTopology>& edge_topology,
+           const cpp17::optional<fitting::ContourLandmarks>& contour_landmarks,
+           const cpp17::optional<fitting::ModelContour>& model_contour,
            int num_iterations, cpp17::optional<int> num_shape_coefficients_to_fit, float lambda_identity,
            cpp17::optional<int> num_expression_coefficients_to_fit,
            cpp17::optional<float> lambda_expressions) {
             std::vector<float> pca_coeffs;
             std::vector<float> blendshape_coeffs;
             std::vector<Eigen::Vector2f> fitted_image_points;
-            const auto result = fitting::fit_shape_and_pose(
-                morphable_model, landmarks, landmark_mapper, image_width, image_height, edge_topology,
-                contour_landmarks, model_contour, num_iterations, num_shape_coefficients_to_fit,
-                lambda_identity, num_expression_coefficients_to_fit, lambda_expressions, cpp17::nullopt,
-                pca_coeffs, blendshape_coeffs, fitted_image_points);
+            std::pair<core::Mesh, fitting::RenderingParameters> result;
+            if (edge_topology && contour_landmarks && model_contour) {
+                result = fitting::fit_shape_and_pose(
+                    morphable_model,
+                    landmarks,
+                    landmark_mapper,
+                    image_width,
+                    image_height,
+                    edge_topology.value(),
+                    contour_landmarks.value(),
+                    model_contour.value(),
+                    num_iterations,
+                    num_shape_coefficients_to_fit,
+                    lambda_identity,
+                    num_expression_coefficients_to_fit,
+                    lambda_expressions,
+                    cpp17::nullopt,
+                    pca_coeffs,
+                    blendshape_coeffs,
+                    fitted_image_points);
+            } else {
+                std::vector<int> vertex_indices;
+                std::vector<Eigen::Vector2f> image_points;
+                std::tie(vertex_indices, image_points) = fitting::map_landmarks(landmarks, landmark_mapper);
+
+                result = fitting::fit_shape_and_pose(
+                    morphable_model,
+                    image_points,
+                    vertex_indices,
+                    image_width,
+                    image_height,
+                    num_iterations,
+                    num_shape_coefficients_to_fit,
+                    lambda_identity,
+                    num_expression_coefficients_to_fit,
+                    lambda_expressions,
+                    cpp17::nullopt,
+                    pca_coeffs,
+                    blendshape_coeffs,
+                    fitted_image_points);
+            }
             return std::make_tuple(result.first, result.second, pca_coeffs, blendshape_coeffs);
         },
         "Fit the pose (camera), shape model, and expression blendshapes to landmarks, in an iterative way. "

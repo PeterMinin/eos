@@ -272,6 +272,28 @@ fit_expressions(const morphablemodel::ExpressionModel& expression_model, const E
     }
 };
 
+inline auto map_landmarks(
+        const core::LandmarkCollection<Eigen::Vector2f>& landmarks, const core::LandmarkMapper& landmark_mapper) {
+    std::vector<int> vertex_indices; // their vertex indices
+    std::vector<Eigen::Vector2f> image_points; // the corresponding 2D landmark points
+
+    // Sub-select all the landmarks which we have a mapping for (i.e. that are defined in the 3DMM),
+    // and get the corresponding model points (mean if given no initial coeffs, from the computed shape otherwise):
+    for (int i = 0; i < landmarks.size(); ++i)
+    {
+        auto converted_name = landmark_mapper.convert(landmarks[i].name);
+        if (!converted_name)
+        { // no mapping defined for the current landmark
+            continue;
+        }
+        int vertex_idx = std::stoi(converted_name.value());
+        vertex_indices.emplace_back(vertex_idx);
+        image_points.emplace_back(landmarks[i].coordinates);
+    }
+
+    return std::make_tuple(vertex_indices, image_points);
+}
+
 /**
  * @brief Fit the pose (camera), shape model, and expression blendshapes to landmarks,
  * in an iterative way.
@@ -379,21 +401,11 @@ inline std::pair<core::Mesh, fitting::RenderingParameters> fit_shape_and_pose(
     vector<int> vertex_indices; // their vertex indices
     vector<Vector2f> image_points; // the corresponding 2D landmark points
 
-    // Sub-select all the landmarks which we have a mapping for (i.e. that are defined in the 3DMM),
-    // and get the corresponding model points (mean if given no initial coeffs, from the computed shape otherwise):
-    for (int i = 0; i < landmarks.size(); ++i)
-    {
-        auto converted_name = landmark_mapper.convert(landmarks[i].name);
-        if (!converted_name)
-        { // no mapping defined for the current landmark
-            continue;
-        }
-        int vertex_idx = std::stoi(converted_name.value());
+    std::tie(vertex_indices, image_points) = map_landmarks(landmarks, landmark_mapper);
+    for (int vertex_idx : vertex_indices) {
         Vector4f vertex(current_mesh.vertices[vertex_idx][0], current_mesh.vertices[vertex_idx][1],
                         current_mesh.vertices[vertex_idx][2], 1.0f);
         model_points.emplace_back(vertex);
-        vertex_indices.emplace_back(vertex_idx);
-        image_points.emplace_back(landmarks[i].coordinates);
     }
 
     // Need to do an initial pose fit to do the contour fitting inside the loop.
