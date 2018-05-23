@@ -26,6 +26,7 @@
 #include "eos/fitting/linear_shape_fitting.hpp"
 #include "eos/fitting/orthographic_camera_estimation_linear.hpp"
 #include "eos/morphablemodel/MorphableModel.hpp"
+#include "eos/render/draw_utils.hpp"
 #include "eos/render/texture_extraction.hpp"
 #include "eos/render/utils.hpp"
 
@@ -176,11 +177,17 @@ int main(int argc, char* argv[])
     // Obtain the full mesh with the estimated coefficients:
     const core::Mesh mesh = morphable_model.draw_sample(fitted_coeffs, vector<float>());
 
+    // Draw the fitted mesh as wireframe, and save the image:
+    render::draw_wireframe(outimg, mesh, rendering_params.get_modelview(), rendering_params.get_projection(),
+                           fitting::get_opencv_viewport(image.cols, image.rows));
+    fs::path outputfile = outputbasename + ".png";
+    cv::imwrite(outputfile.string(), outimg);
+
     // Extract the texture from the image using given mesh and camera parameters:
     const core::Image4u isomap = render::extract_texture(mesh, affine_from_ortho, core::from_mat(image));
 
     // Save the mesh as textured obj:
-    fs::path outputfile = outputbasename + ".obj";
+    outputfile = outputbasename + ".obj";
     core::write_textured_obj(mesh, outputfile.string());
 
     // And save the isomap:
