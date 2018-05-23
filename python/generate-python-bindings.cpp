@@ -45,6 +45,8 @@
 
 #include "Eigen/Core"
 
+#include "glm/gtx/euler_angles.hpp"
+
 #include <cassert>
 #include <string>
 
@@ -246,8 +248,9 @@ PYBIND11_MODULE(eos, eos_module)
              "Returns the rotation quaternion [x y z w].")
         .def("get_rotation_euler_angles",
              [](const fitting::RenderingParameters& p) {
-                 const glm::vec3 euler_angles = glm::eulerAngles(p.get_rotation());
-                 return Eigen::Vector3f(euler_angles[0], euler_angles[1], euler_angles[2]);
+                 float pitch, yaw, roll;
+                 glm::extractEulerAngleXYZ(glm::mat4_cast(p.get_rotation()), pitch, yaw, roll);
+                 return Eigen::Vector3f(pitch, yaw, roll);
             },
              "Returns the rotation's Euler angles (in radians) as [pitch, yaw, roll].")
         .def("get_modelview",
